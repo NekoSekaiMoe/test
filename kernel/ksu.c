@@ -3,6 +3,7 @@
 #include <linux/kobject.h>
 #include <linux/module.h>
 #include <linux/workqueue.h>
+#include <linux/version.h>
 
 #include "allowlist.h"
 #include "arch.h"
@@ -39,6 +40,12 @@ extern void ksu_ksud_exit();
 
 int __init kernelsu_init(void)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+#error("This KernelSU modification only support non-gki device.")
+#else
+	pr_alert("This is an modification about non-gki kernel for KernelSU. Use of unofficial modifications may result in damage to the mobile phone software or other losses.");
+#endif
+
 #ifdef CONFIG_KSU_DEBUG
 	pr_alert("*************************************************************");
 	pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
@@ -94,7 +101,3 @@ module_exit(kernelsu_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("weishu");
 MODULE_DESCRIPTION("Android KernelSU");
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
-#endif
