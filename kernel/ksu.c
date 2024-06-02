@@ -3,8 +3,6 @@
 #include <linux/kobject.h>
 #include <linux/module.h>
 #include <linux/workqueue.h>
-#include <linux/version.h>
-
 #include "allowlist.h"
 #include "arch.h"
 #include "core_hook.h"
