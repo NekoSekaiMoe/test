@@ -1,0 +1,30 @@
+name: Sync folder with commit history
+
+on:
+  workflow_dispatch:
+#  schedule:
+#    - cron: '0 0 * * *'
+
+jobs:
+  sync-folder:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout target repo
+      uses: actions/checkout@v4
+      with:
+        path: 'target-repo'
+
+    - name: Create temporary git patch folder
+      run: mkdir patches
+
+    - name: Checkout source repo and create patches
+      run: |
+        git clone https://github.com/tiann/KernelSU /tmp/source-repo
+        cd /tmp/source-repo
+        git format-patch -o /github/workspace/patches git rev-list --max-parents=0 HEAD..HEAD -- specific/folder/
+
+    - name: Apply patches to target repo
+      run: |
+        cd target-repo
+        git am /github/workspace/patches/*.patch || (git am --abort && exit 1)
+        git push

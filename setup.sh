@@ -1,4 +1,6 @@
 #!/bin/sh
+# shellcheck disable=SC2119,SC2120
+
 set -eu
 
 GKI_ROOT=$(pwd)

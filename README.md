@@ -1,7 +1,7 @@
 KernelSU modification for non-gki device
 =========================================
 
-> **Warning**
+> [!IMPORTANT]
 >
 > This unofficial change is for my own use only, so I will not address any requests I receive that include bug fixes and feature additions.
 

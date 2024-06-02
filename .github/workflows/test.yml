@@ -1,0 +1,46 @@
+name: build Test
+
+on:
+  push:
+
+jobs:
+  build-kernel:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Setup environment
+        uses: daaku/gh-action-apt-install@v4
+        with:
+          packages: ccache libncurses5-dev libncurses-dev libssl-dev device-tree-compiler bc cpio lib32ncurses5-dev lib32z1 build-essential binutils bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev git aria2 
+
+      - name: Pull toolchain
+        run: |
+          cd $HOME
+          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 aarch64-linux-android-4.9
+          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 arm-linux-androideabi-4.9
+
+      - name: Pull clang
+
+        run: |
+          cd $HOME
+          git clone https://github.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-6443078 clang --depth=2
+
+      - name: Pull kernel source
+        run: git clone https://github.com/AcmeUI-Devices/android_kernel_xiaomi_cas msm-4.19
+
+      - name: Initialize KernelSU
+        run: curl -SsL https://github.com/NekoSekaiMoe/test/raw/main/setup.sh | bash -
+
+      - name: build
+        run: |
+          cd msm-4.19
+          mkdir out
+          export BUILD_CROSS_COMPILE=$HOME/aarch64-linux-android-4.9/bin/aarch64-linux-android-
+          export CLANG_PATH=$HOME/clang/bin
+          export CROSS_COMPILE_ARM32=$HOME/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+          export ARCH=arm64
+          export PATH=${CLANG_PATH}:${PATH}
+          make -j$(nproc) -C $(pwd) O=$(pwd)/out CROSS_COMPILE=$BUILD_CROSS_COMPILE CLANG_TRIPLE=$CLANG_TRIPLE CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
+              CC=clang \
+              cas_defconfig all
