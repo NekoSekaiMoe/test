@@ -30,7 +30,7 @@ perform_cleanup() {
         grep -q "kernelsu" "$DRIVER_MAKEFILE" && sed -i '/kernelsu/d' "$DRIVER_MAKEFILE" && echo "[-] Makefile reverted."
         grep -q "drivers/kernelsu/Kconfig" "$DRIVER_KCONFIG" && sed -i '/drivers\/kernelsu\/Kconfig/d' "$DRIVER_KCONFIG" && echo "[-] Kconfig reverted."
         if [ -d "$GKI_ROOT/KernelSU" ]; then
-            rm -rf "$GKI_ROOT/KernelSU .gitsubmodules" && echo "[-] KernelSU directory deleted."
+            rm -rf "$GKI_ROOT/KernelSU" && rm -rf "$GKI_ROOT/.gitsubmodules" && echo "[-] KernelSU directory deleted."
         fi
     fi
 }
@@ -38,10 +38,17 @@ perform_cleanup() {
 # Sets up or update KernelSU environment
 setup_kernelsu() {
     echo "[+] Setting up KernelSU..."
-    printf "[!] Warning: This is an modification about non-gki kernel for KernelSU. Use of unofficial modifications may result in damage to the mobile phone software or other losses."
-    test -d "$GKI_ROOT/KernelSU" || git clone https://github.com/NekoSekaiMoe/test -b "$1" "KernelSU" && echo "[+] Repository cloned."
-    cd KernelSU && git checkout . && git clean -dxf && cd ..
-    ln -sf "$(realpath --relative-to="$DRIVER_DIR" "$GKI_ROOT/KernelSU/kernel")" "kernelsu" && echo "[+] Symlink created."
+    echo "[!] Warning: This is an modification about non-gki kernel for KernelSU. Use of unofficial modifications may result in damage to the mobile phone software or other losses."
+
+    if [ -z "${1-}" ]; then
+        test -d "$GKI_ROOT/KernelSU" || git clone https://github.com/NekoSekaiMoe/test "KernelSU" && echo "[+] Repository cloned."
+    else
+        test -d "$GKI_ROOT/KernelSU" || git clone https://github.com/NekoSekaiMoe/test -b "$1" "KernelSU" && echo "[+] Repository cloned."
+    fi
+
+    cd "$GKI_ROOT/KernelSU" && git checkout . && git clean -dxf && cd "$GKI_ROOT"
+    cd "$GKI_ROOT/drivers"
+    ln -sf "$GKI_ROOT/KernelSU/kernel" "$GKI_ROOT/drivers/kernelsu" && echo "[+] Symlink created."
 
     # Add entries in Makefile and Kconfig if not already existing
     grep -q "kernelsu" "$DRIVER_MAKEFILE" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_MAKEFILE" && echo "[+] Modified Makefile."
@@ -50,7 +57,6 @@ setup_kernelsu() {
 }
 
 # Process command-line arguments
-main() {
     if [ "$#" -eq 0 ]; then
         initialize_variables
         setup_kernelsu
@@ -61,6 +67,3 @@ main() {
         initialize_variables
         setup_kernelsu "$@"
     fi
-}
-
-main

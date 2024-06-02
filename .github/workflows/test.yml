@@ -9,9 +9,11 @@ jobs:
 
     steps:
       - name: Setup environment
-        uses: daaku/gh-action-apt-install@v4
-        with:
-          packages: ccache libncurses5-dev libncurses-dev libssl-dev device-tree-compiler bc cpio lib32ncurses5-dev lib32z1 build-essential binutils bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev git aria2 
+        run: |
+          sudo apt update && sudo apt install ccache libncurses5-dev libncurses-dev libssl-dev device-tree-compiler bc cpio lib32ncurses5-dev lib32z1 build-essential binutils bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev git aria2 python2.7 python2.7-minimal -y
+          test -f /bin/python && sudo rm -v /bin/python
+          test -f /bin/python || sudo ln -v -s /bin/python2.7 /bin/python
+          test -f /bin/python2 || sudo ln -v -s /bin/python2.7 /bin/python2
 
       - name: Pull toolchain
         run: |
@@ -23,13 +25,13 @@ jobs:
 
         run: |
           cd $HOME
-          git clone https://github.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-6443078 clang --depth=2
+          git clone https://github.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-6443078 clang --depth=1
 
       - name: Pull kernel source
-        run: git clone https://github.com/AcmeUI-Devices/android_kernel_xiaomi_cas msm-4.19
+        run: git clone https://github.com/AcmeUI-Devices/android_kernel_xiaomi_cas msm-4.19 --depth=1
 
       - name: Initialize KernelSU
-        run: curl -SsL https://github.com/NekoSekaiMoe/test/raw/main/setup.sh | bash -
+        run: cd msm-4.19 && curl -SsL https://github.com/NekoSekaiMoe/test/raw/main/setup.sh | bash -
 
       - name: build
         run: |
