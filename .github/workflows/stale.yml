@@ -5,8 +5,7 @@ name: Close GitHub Pull Requests
 
 # Trigger this workflow every 12 hours.
 on:
-  schedule:
-    - cron: '* */12 * * *'
+  pull_request:
 
 jobs:
   close_prs:
