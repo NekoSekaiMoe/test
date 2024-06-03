@@ -11,9 +11,6 @@ jobs:
   close_prs:
     name: Close Pull Requests
     runs-on: ubuntu-latest
-    # Only run this job in the read-only mirror repository.
-    if: github.repository == 'blender/blender' && contains(github.server_url, 'github.com')
-    # Permissions granted to the GitHub Actions bot.
     permissions:
       pull-requests: write
     steps:
