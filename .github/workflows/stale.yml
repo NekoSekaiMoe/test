@@ -6,6 +6,7 @@ name: Close GitHub Pull Requests
 # Trigger this workflow every 12 hours.
 on:
   pull_request:
+    types: [opened, reopened, edited]
 
 jobs:
   close_prs:
