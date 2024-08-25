@@ -10,10 +10,6 @@ run shell script:
 ```bash
 $ bash (curl -SsL https://github.com/NekoSekaiMoe/test/raw/main/setup.sh) -s main
 ```
-or run python sctipt(WIP):
-```bash
-$ python3 $(curl -SsL https://github.com/NekoSekaiMoe/test/raw/main/setup.py)
-```
 
 ## License
 Follow from upstream
