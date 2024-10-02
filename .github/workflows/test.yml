@@ -31,7 +31,7 @@ jobs:
         run: git clone https://github.com/AcmeUI-Devices/android_kernel_xiaomi_cas msm-4.19 --depth=1
 
       - name: Initialize KernelSU
-        run: cd msm-4.19 && curl -SsL https://github.com/NekoSekaiMoe/test/raw/main/setup.sh | bash -
+        run: cd msm-4.19 && curl -SsL https://github.com/NekoSekaiMoe/test/raw/main/kernel/setup.sh | bash -
 
       - name: build
         run: |
