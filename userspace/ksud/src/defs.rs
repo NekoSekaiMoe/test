@@ -30,7 +30,7 @@ pub const SYSTEM_RW_DIR: &str = concatcp!(MODULE_DIR, ".rw/");
 
 pub const TEMP_DIR: &str = "/debug_ramdisk";
 pub const TEMP_DIR_LEGACY: &str = "/sbin";
-
+pub const MODULE_ACTION_SH: &str = "action.sh";
 pub const MODULE_WEB_DIR: &str = "webroot";
 pub const DISABLE_FILE_NAME: &str = "disable";
 pub const UPDATE_FILE_NAME: &str = "update";
