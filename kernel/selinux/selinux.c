@@ -6,8 +6,6 @@
 #include "avc.h"
 #endif
 
-#define KERNEL_SU_DOMAIN "u:r:su:s0"
-
 static int transive_to_domain(const char *domain)
 {
 	struct cred *cred;
@@ -108,7 +106,7 @@ bool is_ksu_domain()
 	if (err) {
 		return false;
 	}
-	result = strncmp(KERNEL_SU_DOMAIN, domain, seclen) == 0;
+	result = strncmp(KERNEL_SU_CONTEXT, domain, seclen) == 0;
 	security_release_secctx(domain, seclen);
 	return result;
 }
