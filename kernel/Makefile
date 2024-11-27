@@ -12,8 +12,47 @@ kernelsu-objs += selinux/selinux.o
 kernelsu-objs += selinux/sepolicy.o
 kernelsu-objs += selinux/rules.o
 kernelsu-objs += selinux/kernel_compat.o
+
+kernelsu-objs += libsepol/src/node_record.o
+kernelsu-objs += libsepol/src/nodes.o
+kernelsu-objs += libsepol/src/optimize.o
+kernelsu-objs += libsepol/src/polcaps.o
+kernelsu-objs += libsepol/src/policydb.o
+kernelsu-objs += libsepol/src/policydb_convert.o
+kernelsu-objs += libsepol/src/policydb_public.o
+kernelsu-objs += libsepol/src/policydb_validate.o
+kernelsu-objs += libsepol/src/port_record.o
+kernelsu-objs += libsepol/src/ports.o
+kernelsu-objs += libsepol/src/services.o
+kernelsu-objs += libsepol/src/sidtab.o
+kernelsu-objs += libsepol/src/symtab.o
+kernelsu-objs += libsepol/src/user_record.o
+kernelsu-objs += libsepol/src/users.o
+kernelsu-objs += libsepol/src/util.o
+kernelsu-objs += libsepol/src/write.o
+kernelsu-objs += libsepol/src/inet_ntop.o
+kernelsu-objs += libsepol/src/link.o
+kernelsu-objs += libsepol/src/mls.o
+kernelsu-objs += libsepol/src/module.o
+kernelsu-objs += libsepol/src/assertion.o
+kernelsu-objs += libsepol/src/avrule_block.o
+kernelsu-objs += libsepol/src/avtab.o
+kernelsu-objs += libsepol/src/boolean_record.o
+kernelsu-objs += libsepol/src/booleans.o
+kernelsu-objs += libsepol/src/conditional.o
+kernelsu-objs += libsepol/src/constraint.o
+kernelsu-objs += libsepol/src/context.o
+kernelsu-objs += libsepol/src/context_record.o
+kernelsu-objs += libsepol/src/debug.o
+kernelsu-objs += libsepol/src/ebitmap.o
+kernelsu-objs += libsepol/src/expand.o
+kernelsu-objs += libsepol/src/handle.o
+kernelsu-objs += libsepol/src/hashtab.o
+kernelsu-objs += libsepol/src/hierarchy.o
+
 ccflags-y += -I$(srctree)/security/selinux -I$(srctree)/security/selinux/include
 ccflags-y += -I$(objtree)/security/selinux -include $(srctree)/include/uapi/asm-generic/errno.h
+ccflags-y += -I./libsepol/include
 
 obj-$(CONFIG_KSU) += kernelsu.o
 
