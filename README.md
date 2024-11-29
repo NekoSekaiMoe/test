@@ -11,5 +11,10 @@ run shell script:
 $ bash (curl -SsL https://github.com/NekoSekaiMoe/test/raw/main/setup.sh) -s main
 ```
 
+> [!NOTE]
+This only changes kernel hook.
+
+For ksud , you should install [Modification KernelSU apk](https://github.com/backslashxx/KernelSU/releases/download/v1.0.2/KernelSU_v1.0.2_11986-legacy-release.apk)
+
 ## License
 Follow from upstream
