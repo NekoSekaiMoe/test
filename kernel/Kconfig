@@ -24,6 +24,14 @@ config KSU_ALLOWLIST_WORKAROUND
           Enable session keyring init workaround for problematic devices.
           Useful for situations where the SU allowlist is not kept after a reboot.
 
+config KSU_CMDLINE
+	bool "Enable KernelSU toggle cmdline"
+	depends on KSU
+	default n
+	help
+	  Enable a cmdline called kernelsu.enabled.
+	  Value 1 means enabled, value 0 means disabled.
+
 menu "KernelSU - SUSFS"
 config KSU_SUSFS
     bool "KernelSU addon - SUSFS"

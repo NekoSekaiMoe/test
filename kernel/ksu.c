@@ -14,6 +14,25 @@
 #include <linux/susfs.h>
 #endif
 
+#ifdef CONFIG_KSU_CMDLINE
+#include <linux/init.h>
+#endif
+
+#ifdef CONFIG_KSU_CMDLINE
+unsigned int enable_kernelsu = 1;
+static int __init read_kernelsu_state(char *s)
+{
+	if (s)
+		enable_kernelsu = simple_strtoul(s, NULL, 0);
+	return 1;
+}
+__setup("kernelsu.enabled=", read_kernelsu_state);
+unsigned int get_ksu_state(void)
+{
+	return enable_kernelsu;
+}
+#endif
+
 static struct workqueue_struct *ksu_workqueue;
 
 bool ksu_queue_work(struct work_struct *work)
@@ -46,6 +65,13 @@ extern void ksu_enable_selinux_compat();
 
 int __init kernelsu_init(void)
 {
+#ifdef CONFIG_KSU_CMDLINE
+	if (enable_kernelsu < 1) {
+		pr_info_once(" is disabled");
+		return 0;
+	}
+#endif
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 #error("This KernelSU modification only support non-gki device.")
 #else
@@ -94,6 +120,11 @@ int __init kernelsu_init(void)
 
 void kernelsu_exit(void)
 {
+#ifdef CONFIG_KSU_CMDLINE
+	if (enable_kernelsu < 1)
+		return;
+#endif
+
 	ksu_allowlist_exit();
 
 	ksu_throne_tracker_exit();
