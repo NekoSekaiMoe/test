@@ -3,11 +3,10 @@
 
 #include <linux/types.h>
 
-bool is_manager_apk()
+static inline bool is_manager_apk()
 {
-        return true;
+    return true;
 }
 
-bool is_manager_apk();
-
 #endif
+
