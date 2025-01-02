@@ -118,7 +118,6 @@ static void disable_seccomp()
 {
 	assert_spin_locked(&current->sighand->siglock);
 	// disable seccomp
-	current_thread_info()->syscall_work &= ~SYSCALL_WORK_SECCOMP;
 	current_thread_info()->flags &= ~(TIF_SECCOMP | _TIF_SECCOMP);
 
 #ifdef CONFIG_SECCOMP
