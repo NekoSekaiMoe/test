@@ -86,7 +86,18 @@ endif
 ccflags-y += -Wno-implicit-function-declaration -Wno-strict-prototypes -Wno-int-conversion -Wno-gcc-compat
 ccflags-y += -Wno-declaration-after-statement -Wno-unused-function -Wno-error
 
-# This feature is introduced in linux 5.0-rc1
+# Determine the appropriate atomic function and apply patch accordingly
+ifeq ($(shell grep -q "atomic_inc_not_zero" $(srctree)/kernel/cred.c; echo $$?),0)
+ATOMIC_INC_FUNC = atomic_inc_not_zero
+else ifeq ($(shell grep -q "atomic_long_inc_not_zero" $(srctree)/kernel/cred.c; echo $$?),0)
+ATOMIC_INC_FUNC = atomic_long_inc_not_zero
+else
+$(info -- KernelSU: Neither atomic_inc_not_zero nor atomic_long_inc_not_zero found in kernel/cred.c)
+endif
+
+# Inform which function is being patched
+$(info -- KernelSU: Using $(ATOMIC_INC_FUNC) in get_cred_rcu patch.)
+# Add the get_cred_rcu function to cred.h if not already present
 ifneq ($(shell grep -Eq "^static inline const struct cred \*get_cred_rcu" $(srctree)/include/linux/cred.h; echo $$?),0)
 $(info -- KernelSU: adding function 'static inline const struct cred *get_cred_rcu(const struct cred *cred);' to $(srctree)/include/linux/cred.h)
 GET_CRED_RCPU = static inline const struct cred *get_cred_rcu(const struct cred *cred)\n\
@@ -94,7 +105,7 @@ GET_CRED_RCPU = static inline const struct cred *get_cred_rcu(const struct cred 
         struct cred *nonconst_cred = (struct cred *) cred;\n\t\
         if (!cred)\n\t\t\
                 return NULL;\n\t\
-        if (!atomic_inc_not_zero(&nonconst_cred->usage))\n\t\t\
+        if (!$(ATOMIC_INC_FUNC)(&nonconst_cred->usage))\n\t\t\
                 return NULL;\n\t\
         validate_creds(cred);\n\t\
         return cred;\n\
@@ -102,7 +113,7 @@ GET_CRED_RCPU = static inline const struct cred *get_cred_rcu(const struct cred 
 $(shell grep -qF "$(GET_CRED_RCPU)" $(srctree)/include/linux/cred.h || sed -i '/^static inline void put_cred/i $(GET_CRED_RCPU)' $(srctree)/include/linux/cred.h)
 
 $(info -- KernelSU: modifying 'get_task_cred' function in $(srctree)/kernel/cred.c)
-$(shell sed -i 's/!atomic_inc_not_zero(&((struct cred \*)cred)->usage)/!get_cred_rcu(cred)/g' $(srctree)/kernel/cred.c)
+$(shell sed -i "s/!$(ATOMIC_INC_FUNC)(&((struct cred \*)cred)->usage)/!get_cred_rcu(cred)/g" $(srctree)/kernel/cred.c)
 endif
 
 ifneq ($(shell grep -Eq "^static int can_umount" $(srctree)/fs/namespace.c; echo $$?),0)
