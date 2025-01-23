@@ -1,0 +1,261 @@
+From 385786ac9fd791e624e9f5b0a23a02ec0f71adc6 Mon Sep 17 00:00:00 2001
+From: Pzqqt <821026875@qq.com>
+Date: Thu, 23 Jan 2025 14:52:40 +0000
+Subject: [PATCH] kernel: Allow KPROBES hooks optional on GKI
+
+Some apps will detect that KernelSU uses kprobes and think that the device
+environment is abnormal. Therefore, to avoid being detected, it is best to
+follow the official documentation of KernelSU to manually hook, just like
+doing it on a traditional kernel.
+
+This commit allows us to manually hook while keeping `CONFIG_KPROBES` enabled.
+
+Notes:
+The kernel having kprobes support does not mean that the environment is
+abnormal, because GKI has kprobes support by default, and disabling kprobes
+support will make it impossible to start the device.
+
+Signed-off-by: SekaiMoe <153579552+SekaiMoe@users.noreply.github.com>
+Co-authored-by: Pzqqt <821026875@qq.com>
+---
+ kernel/Kconfig     | 15 ++++++++++++---
+ kernel/Makefile    |  8 ++++++++
+ kernel/core_hook.c |  4 +++-
+ kernel/ksu.c       |  4 ++--
+ kernel/ksud.c      | 22 +++++++++++-----------
+ kernel/sucompat.c  |  6 +++---
+ 6 files changed, 39 insertions(+), 20 deletions(-)
+
+diff --git a/kernel/Kconfig b/kernel/Kconfig
+index 8e6ce75..9beff0f 100644
+--- a/kernel/Kconfig
++++ b/kernel/Kconfig
+@@ -1,13 +1,11 @@
+ menu "KernelSU"
+ 
+ config KSU
+-	tristate "KernelSU function support"
++	bool "KernelSU function support"
+ 	depends on OVERLAY_FS
+ 	default y
+ 	help
+ 	  Enable kernel-level root privileges on Android System.
+-	  To compile as a module, choose M here: the
+-	  module will be called kernelsu.
+ 
+ config KSU_DEBUG
+ 	bool "KernelSU debug mode"
+@@ -32,6 +30,17 @@ config KSU_CMDLINE
+ 	  Enable a cmdline called kernelsu.enabled.
+ 	  Value 1 means enabled, value 0 means disabled.
+ 
++config KSU_MANUAL_HOOK
++	bool "Manual hooking GKI kernels without kprobes"
++	depends on KSU && KSU != m
++	depends on KPROBES
++	default n
++	help
++	  Keep KPROBES enabled but do not use KPROBES to implement
++	  the hooks required by KernelSU, but instead hook them manually.
++	  This function only available on GKI kernels, non-GKI are not
++	  affected.
++
+ menu "KernelSU - SUSFS"
+ config KSU_SUSFS
+     bool "KernelSU addon - SUSFS"
+diff --git a/kernel/Makefile b/kernel/Makefile
+index 16f5181..56619d6 100644
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -83,6 +83,14 @@ ccflags-y += -DKSU_MANAGER_PACKAGE=\"$(KSU_MANAGER_PACKAGE)\"
+ $(info -- KernelSU Manager package name: $(KSU_MANAGER_PACKAGE))
+ endif
+ 
++# GKI manual hook checks
++# https://github.com/Pzqqt/android_kernel_xiaomi_marble/commit/5b8596b5604bcd0e6e12697a01136a0bb9eb0257
++ifneq ($(CONFIG_KSU_MANUAL_HOOK),y)
++ifeq ($(CONFIG_KPROBES),y)
++ccflags-y += -DKSU_HOOK_WITH_KPROBES
++endif
++endif
++
+ ccflags-y += -Wno-implicit-function-declaration -Wno-strict-prototypes -Wno-int-conversion -Wno-gcc-compat
+ ccflags-y += -Wno-declaration-after-statement -Wno-unused-function -Wno-error
+ 
+diff --git a/kernel/core_hook.c b/kernel/core_hook.c
+index 593ba8d..3197888 100644
+--- a/kernel/core_hook.c
++++ b/kernel/core_hook.c
+@@ -793,7 +793,7 @@ int ksu_handle_setuid(struct cred *new, const struct cred *old)
+ }
+ 
+ // Init functons
+-
++#if defined(CONFIG_KSU_MANUAL_HOOK)
+ static int handler_pre(struct kprobe *p, struct pt_regs *regs)
+ {
+ 	struct pt_regs *real_regs = PT_REAL_REGS(regs);
+@@ -861,6 +861,8 @@ __maybe_unused int ksu_kprobe_exit(void)
+ 	return 0;
+ }
+ 
++#endif
++
+ static int ksu_task_prctl(int option, unsigned long arg2, unsigned long arg3,
+ 			  unsigned long arg4, unsigned long arg5)
+ {
+diff --git a/kernel/ksu.c b/kernel/ksu.c
+index f96c491..15c1de5 100644
+--- a/kernel/ksu.c
++++ b/kernel/ksu.c
+@@ -100,7 +100,7 @@ int __init kernelsu_init(void)
+ 
+ 	ksu_throne_tracker_init();
+ 
+-#ifdef CONFIG_KPROBES
++#ifdef KSU_HOOK_WITH_KPROBES
+ 	ksu_sucompat_init();
+ 	ksu_ksud_init();
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+@@ -131,7 +131,7 @@ void kernelsu_exit(void)
+ 
+ 	destroy_workqueue(ksu_workqueue);
+ 
+-#ifdef CONFIG_KPROBES
++#ifdef KSU_HOOK_WITH_KPROBES
+ 	ksu_ksud_exit();
+ 	ksu_sucompat_exit();
+ #endif
+diff --git a/kernel/ksud.c b/kernel/ksud.c
+index 68e4735..f054171 100644
+--- a/kernel/ksud.c
++++ b/kernel/ksud.c
+@@ -54,7 +54,7 @@ static void stop_vfs_read_hook();
+ static void stop_execve_hook();
+ static void stop_input_hook();
+ 
+-#ifdef CONFIG_KPROBES
++#ifdef KSU_HOOK_WITH_KPROBES
+ static struct work_struct stop_vfs_read_work;
+ static struct work_struct stop_execve_hook_work;
+ static struct work_struct stop_input_hook_work;
+@@ -157,7 +157,7 @@ int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
+ 			     struct user_arg_ptr *argv,
+ 			     struct user_arg_ptr *envp, int *flags)
+ {
+-#ifndef CONFIG_KPROBES
++#ifndef KSU_HOOK_WITH_KPROBES
+ 	if (!ksu_execveat_hook) {
+ 		return 0;
+ 	}
+@@ -313,7 +313,7 @@ static ssize_t read_iter_proxy(struct kiocb *iocb, struct iov_iter *to)
+ int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr,
+ 			size_t *count_ptr, loff_t **pos)
+ {
+-#ifndef CONFIG_KPROBES
++#ifndef KSU_HOOK_WITH_KPROBES
+ 	if (!ksu_vfs_read_hook) {
+ 		return 0;
+ 	}
+@@ -426,7 +426,7 @@ static bool is_volumedown_enough(unsigned int count)
+ int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code,
+ 				  int *value)
+ {
+-#ifndef CONFIG_KPROBES
++#ifndef KSU_HOOK_WITH_KPROBES
+ 	if (!ksu_input_hook) {
+ 		return 0;
+ 	}
+@@ -468,7 +468,7 @@ bool ksu_is_safe_mode()
+ 	return false;
+ }
+ 
+-#ifdef CONFIG_KPROBES
++#ifdef KSU_HOOK_WITH_KPROBES
+ 
+ // https://elixir.bootlin.com/linux/v5.10.158/source/fs/exec.c#L1864
+ static int execve_handler_pre(struct kprobe *p, struct pt_regs *regs)
+@@ -598,7 +598,7 @@ static void do_stop_input_hook(struct work_struct *work)
+ 
+ static void stop_vfs_read_hook()
+ {
+-#ifdef CONFIG_KPROBES
++#ifdef KSU_HOOK_WITH_KPROBES
+ 	bool ret = schedule_work(&stop_vfs_read_work);
+ 	pr_info("unregister vfs_read kprobe: %d!\n", ret);
+ #else
+@@ -609,7 +609,7 @@ static void stop_vfs_read_hook()
+ 
+ static void stop_execve_hook()
+ {
+-#ifdef CONFIG_KPROBES
++#ifdef KSU_HOOK_WITH_KPROBES
+ 	bool ret = schedule_work(&stop_execve_hook_work);
+ 	pr_info("unregister execve kprobe: %d!\n", ret);
+ #else
+@@ -625,7 +625,7 @@ static void stop_input_hook()
+ 		return;
+ 	}
+ 	input_hook_stopped = true;
+-#ifdef CONFIG_KPROBES
++#ifdef KSU_HOOK_WITH_KPROBES
+ 	bool ret = schedule_work(&stop_input_hook_work);
+ 	pr_info("unregister input kprobe: %d!\n", ret);
+ #else
+@@ -637,7 +637,7 @@ static void stop_input_hook()
+ // ksud: module support
+ void ksu_ksud_init()
+ {
+-#ifdef CONFIG_KPROBES
++#ifdef KSU_HOOK_WITH_KPROBES
+ 	int ret;
+ 
+ 	ret = register_kprobe(&execve_kp);
+@@ -657,10 +657,10 @@ void ksu_ksud_init()
+ 
+ void ksu_ksud_exit()
+ {
+-#ifdef CONFIG_KPROBES
++#ifdef KSU_HOOK_WITH_KPROBES
+ 	unregister_kprobe(&execve_kp);
+ 	// this should be done before unregister vfs_read_kp
+ 	// unregister_kprobe(&vfs_read_kp);
+ 	unregister_kprobe(&input_event_kp);
+ #endif
+-}
+\ No newline at end of file
++}
+diff --git a/kernel/sucompat.c b/kernel/sucompat.c
+index cc4ea31..6980505 100644
+--- a/kernel/sucompat.c
++++ b/kernel/sucompat.c
+@@ -168,7 +168,7 @@ int ksu_handle_execve_sucompat(int *fd, const char __user **filename_user,
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_KPROBES
++#ifdef KSU_HOOK_WITH_KPROBES
+ 
+ __maybe_unused static int faccessat_handler_pre(struct kprobe *p,
+ 						struct pt_regs *regs)
+@@ -310,7 +310,7 @@ static struct kprobe pts_unix98_lookup_kp = { .symbol_name =
+ // sucompat: permited process can execute 'su' to gain root access.
+ void ksu_sucompat_init()
+ {
+-#ifdef CONFIG_KPROBES
++#ifdef KSU_HOOK_WITH_KPROBES
+ 	int ret;
+ 	ret = register_kprobe(&execve_kp);
+ 	pr_info("sucompat: execve_kp: %d\n", ret);
+@@ -327,7 +327,7 @@ void ksu_sucompat_init()
+ 
+ void ksu_sucompat_exit()
+ {
+-#ifdef CONFIG_KPROBES
++#ifdef KSU_HOOK_WITH_KPROBES
+ 	unregister_kprobe(&execve_kp);
+ 	unregister_kprobe(&execve_compat_kp);
+ 	unregister_kprobe(&newfstatat_kp);
+-- 
+2.47.1
+
