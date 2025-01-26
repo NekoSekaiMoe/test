@@ -12,9 +12,8 @@ my $GKI_ROOT = getcwd();
 sub initialize_variables {
     my $driver_dir;
 
-    if (-d "$GKI_ROOT/common/drivers") {
-        $driver_dir = "$GKI_ROOT/common/drivers";
-    } elsif (-d "$GKI_ROOT/drivers") {
+    # 直接检查 drivers/ 目录
+    if (-d "$GKI_ROOT/drivers") {
         $driver_dir = "$GKI_ROOT/drivers";
     } else {
         die '[ERROR] "drivers/" directory not found.';
@@ -24,6 +23,7 @@ sub initialize_variables {
     my $driver_kconfig = "$driver_dir/Kconfig";
     return ($driver_dir, $driver_makefile, $driver_kconfig);
 }
+
 
 # Reverts modifications made by this script
 sub perform_cleanup {
