@@ -1,117 +1,125 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 use strict;
 use warnings;
-use File::Spec;
 use File::Path qw(remove_tree);
-use File::Basename;
+use Cwd;
 
 my $GKI_ROOT = getcwd();
+my ($DRIVER_DIR, $DRIVER_MAKEFILE, $DRIVER_KCONFIG);
 
-# Initialize variables for driver paths
+# Initialize variables
 sub initialize_variables {
-    my $driver_dir;
-
-    # 直接检查 drivers/ 目录
-    if (-d "$GKI_ROOT/drivers") {
-        $driver_dir = "$GKI_ROOT/drivers";
+    if (-d "$GKI_ROOT/common/drivers") {
+        $DRIVER_DIR = "$GKI_ROOT/common/drivers";
+    } elsif (-d "$GKI_ROOT/drivers") {
+        $DRIVER_DIR = "$GKI_ROOT/drivers";
     } else {
         die '[ERROR] "drivers/" directory not found.';
     }
 
-    my $driver_makefile = "$driver_dir/Makefile";
-    my $driver_kconfig = "$driver_dir/Kconfig";
-    return ($driver_dir, $driver_makefile, $driver_kconfig);
+    $DRIVER_MAKEFILE = "$DRIVER_DIR/Makefile";
+    $DRIVER_KCONFIG = "$DRIVER_DIR/Kconfig";
 }
 
-
-# Reverts modifications made by this script
+# Cleanup function
 sub perform_cleanup {
     print "[+] Cleaning up...\n";
-
-    if (-f '.gitsubmodules' && -f '.git') {
-        system('git submodule deinit KernelSU');
-        system('git rm -rf .git/modules/KernelSU');
+    if (-f ".gitsubmodules" && -f ".git") {
+        system("git submodule deinit KernelSU");
+        system("git rm -rf .git/modules/KernelSU");
     } else {
-        my ($driver_dir, $driver_makefile, $driver_kconfig) = initialize_variables();
-
-        if (-l "$driver_dir/kernelsu") {
-            unlink "$driver_dir/kernelsu" and print "[-] Symlink removed.\n";
+        if (-l "$DRIVER_DIR/kernelsu") {
+            unlink("$DRIVER_DIR/kernelsu");
+            print "[-] Symlink removed.\n";
+        }
+        
+        # Process Makefile
+        if (open(my $fh, '<', $DRIVER_MAKEFILE)) {
+            my $content = do { local $/; <$fh> };
+            close($fh);
+            if ($content =~ /kernelsu/) {
+                $content =~ s/.*kernelsu.*\n//g;
+                open(my $out, '>', $DRIVER_MAKEFILE) or die "Cannot write to $DRIVER_MAKEFILE: $!";
+                print $out $content;
+                close($out);
+                print "[-] Makefile reverted.\n";
+            }
         }
 
-        if (grep { /kernelsu/ } `cat $driver_makefile`) {
-            system("sed -i '/kernelsu/d' $driver_makefile");
-            print "[-] Makefile reverted.\n";
-        }
-
-        if (grep { /drivers\/kernelsu\/Kconfig/ } `cat $driver_kconfig`) {
-            system("sed -i '/drivers\\/kernelsu\\/Kconfig/d' $driver_kconfig");
-            print "[-] Kconfig reverted.\n";
+        # Process Kconfig
+        if (open(my $fh, '<', $DRIVER_KCONFIG)) {
+            my $content = do { local $/; <$fh> };
+            close($fh);
+            if ($content =~ /drivers\/kernelsu\/Kconfig/) {
+                $content =~ s/.*drivers\/kernelsu\/Kconfig.*\n//g;
+                open(my $out, '>', $DRIVER_KCONFIG) or die "Cannot write to $DRIVER_KCONFIG: $!";
+                print $out $content;
+                close($out);
+                print "[-] Kconfig reverted.\n";
+            }
         }
 
         if (-d "$GKI_ROOT/KernelSU") {
             remove_tree("$GKI_ROOT/KernelSU");
-            unlink "$GKI_ROOT/.gitsubmodules";
+            unlink("$GKI_ROOT/.gitsubmodules");
             print "[-] KernelSU directory deleted.\n";
         }
     }
 }
 
-# Sets up or update KernelSU environment
+# Setup KernelSU
 sub setup_kernelsu {
+    my $branch = shift;
+    
     print "[+] Setting up KernelSU...\n";
-    print "[!] Warning: This is a modification about non-gki kernel for KernelSU. Use of unofficial modifications may result in damage to the mobile phone software or other losses.\n";
+    print "[!] Warning: This is an modification about non-gki kernel for KernelSU. Use of unofficial modifications may result in damage to the mobile phone software or other losses.\n";
 
-    my ($branch) = @_;
-
-    unless (-d "$GKI_ROOT/KernelSU") {
-        my $clone_command = "git clone https://github.com/NekoSekaiMoe/test KernelSU";
-        $clone_command .= " -b $branch" if $branch;
-        system($clone_command);
+    if (!-d "$GKI_ROOT/KernelSU") {
+        my $clone_cmd = "git clone https://github.com/NekoSekaiMoe/test";
+        $clone_cmd .= " -b $branch" if defined $branch;
+        $clone_cmd .= " KernelSU";
+        system($clone_cmd) == 0 or die "Failed to clone repository: $?";
         print "[+] Repository cloned.\n";
     }
 
-    chdir "$GKI_ROOT/KernelSU" or die "Failed to change directory: $!";
-    system("git checkout .");
-    system("git clean -dxf");
-    chdir $GKI_ROOT;
+    chdir("$GKI_ROOT/KernelSU") or die "Cannot change to KernelSU directory: $!";
+    system("git checkout . && git clean -dxf") == 0 or die "Git operations failed: $?";
+    chdir($GKI_ROOT) or die "Cannot change back to root directory: $!";
+    chdir("$GKI_ROOT/drivers") or die "Cannot change to drivers directory: $!";
 
-    my ($driver_dir, $driver_makefile, $driver_kconfig) = initialize_variables();
-
-    symlink("$GKI_ROOT/KernelSU/kernel", "$driver_dir/kernelsu") or die "Failed to create symlink: $!";
+    symlink("$GKI_ROOT/KernelSU/kernel", "$GKI_ROOT/drivers/kernelsu") or die "Failed to create symlink: $!";
     print "[+] Symlink created.\n";
 
-    unless (grep { /kernelsu/ } `cat $driver_makefile`) {
-        open my $makefile, '>>', $driver_makefile or die "Cannot open Makefile: $!";
-        print $makefile "\nobj-\$(CONFIG_KSU) += kernelsu/\n";
-        close $makefile;
-        print "[+] Modified Makefile.\n";
-    }
+    # Modify Makefile
+    open(my $mf, '>>', $DRIVER_MAKEFILE) or die "Cannot open Makefile: $!";
+    print $mf "\nobj-\$(CONFIG_KSU) += kernelsu/\n";
+    close($mf);
+    print "[+] Modified Makefile.\n";
 
-    unless (grep { /source \"drivers\/kernelsu\/Kconfig\"/ } `cat $driver_kconfig`) {
-        open my $kconfig, '>>', $driver_kconfig or die "Cannot open Kconfig: $!";
-        print $kconfig "\nsource \"drivers/kernelsu/Kconfig\"\n";
-        close $kconfig;
+    # Modify Kconfig
+    if (open(my $kf, '<', $DRIVER_KCONFIG)) {
+        my $content = do { local $/; <$kf> };
+        close($kf);
+        
+        $content =~ s/endmenu/source "drivers\/kernelsu\/Kconfig"\nendmenu/;
+        
+        open(my $kf_out, '>', $DRIVER_KCONFIG) or die "Cannot write to Kconfig: $!";
+        print $kf_out $content;
+        close($kf_out);
         print "[+] Modified Kconfig.\n";
     }
-
-    print '[+] Done.' . "\n";
+    
+    print "[+] Done.\n";
 }
 
-# Get current working directory
-sub getcwd {
-    return File::Spec->curdir;
-}
+# Main execution
+initialize_variables();
 
-# Process command-line arguments
 if (@ARGV == 0) {
-    my ($driver_dir, $driver_makefile, $driver_kconfig) = initialize_variables();
     setup_kernelsu();
-} elsif ($ARGV[0] eq '--cleanup') {
-    my ($driver_dir, $driver_makefile, $driver_kconfig) = initialize_variables();
+} elsif ($ARGV[0] eq "--cleanup") {
     perform_cleanup();
 } else {
-    my ($driver_dir, $driver_makefile, $driver_kconfig) = initialize_variables();
     setup_kernelsu($ARGV[0]);
 }
-
