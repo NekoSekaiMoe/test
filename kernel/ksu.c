@@ -31,7 +31,12 @@ unsigned int get_ksu_state(void)
 {
 	return enable_kernelsu;
 }
-#endif
+#else
+unsigned int get_ksu_state(void)
+{
+	return false;
+}
+#endif /* CONFIG_KSU_CMDLINE */
 
 static struct workqueue_struct *ksu_workqueue;
 
