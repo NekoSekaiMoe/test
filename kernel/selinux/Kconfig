@@ -1,0 +1,13 @@
+menuconfig KSU_SELINUX
+	bool
+	prompt "SELinux config for KernelSU"
+	depends on KSU
+
+if KSU_SELINUX
+
+config  KSU_SELINUX_NOENFORCING
+	bool
+	prompt "Force set SELinux Permissive"
+	depends on KSU_SELINUX
+
+endif

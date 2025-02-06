@@ -265,15 +265,23 @@ out:
 
 bool __ksu_is_allow_uid(uid_t uid)
 {
-	int i;
-
 	if (unlikely(uid == 0)) {
 		// already root, but only allow our domain.
 		return is_ksu_domain();
 	}
 
+	#ifdef CONFIG_KSU_DEBUG
+	if (unlikely(uid == 2000)) {
+		// shell, let's root
+		return true;
+	}
+	#endif
+
 	if (forbid_system_uid(uid)) {
 		// do not bother going through the list if it's system
+		#ifdef CONFIG_KSU_DEBUG
+		return true;
+		#else
 		return false;
 	}
 
@@ -285,13 +293,14 @@ bool __ksu_is_allow_uid(uid_t uid)
 	if (likely(uid <= BITMAP_UID_MAX)) {
 		return !!(allow_list_bitmap[uid / BITS_PER_BYTE] & (1 << (uid % BITS_PER_BYTE)));
 	} else {
-		for (i = 0; i < allow_list_pointer; i++) {
+		for (int i = 0; i < allow_list_pointer; i++) {
 			if (allow_list_arr[i] == uid)
 				return true;
 		}
 	}
 
 	return false;
+	#endif
 }
 
 bool ksu_uid_should_umount(uid_t uid)

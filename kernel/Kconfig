@@ -116,3 +116,5 @@ config KSU_SUSFS_ENABLE_LOG
 endmenu
 
 endmenu
+
+source "selinux/Kconfig"

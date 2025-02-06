@@ -9,10 +9,6 @@
 #include "linux/lsm_audit.h"
 #include "xfrm.h"
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
-#define SELINUX_POLICY_INSTEAD_SELINUX_SS
-#endif
-
 #define KERNEL_SU_DOMAIN "su"
 #define KERNEL_SU_FILE "ksu_file"
 #define KERNEL_EXEC_TYPE "ksu_exec"
@@ -38,9 +34,12 @@ static struct policydb *get_policydb(void)
 
 void apply_kernelsu_rules()
 {
+	#ifdef CONFIG_KSU_SELINUX_NOENFORCING
 	if (!getenforce()) {
 		pr_info("SELinux permissive or disabled, apply rules!\n");
 	}
+	setenforce(false);
+	#endif
 
 	rcu_read_lock();
 	struct policydb *db = get_policydb();
