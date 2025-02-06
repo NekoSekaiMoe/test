@@ -230,6 +230,25 @@ static int execve_handler_pre(struct kprobe *p, struct pt_regs *regs)
 	return ksu_handle_execveat_sucompat(fd, filename_ptr, NULL, NULL, NULL);
 }
 
+#ifdef CONFIG_KSU_SELINUX_NOENFORCING
+static loff_t enforce_handler_pos_val;
+
+static int enforce_handler_pre(struct kprobe *p, struct pt_regs *regs)
+{
+	loff_t **pos_ptr = (loff_t **)&PT_REGS_CCALL_PARM4(regs);
+	enforce_handler_pos_val = **pos_ptr;
+	return 0;
+}
+static void enforce_handler_post(struct kprobe *p, struct pt_regs *regs, unsigned long i)
+{
+	char __user **buf_ptr = (char **)&PT_REGS_PARM2(regs);
+	size_t *count_ptr = (size_t *)&PT_REGS_PARM3(regs);
+	loff_t **pos_ptr = (loff_t **)&PT_REGS_CCALL_PARM4(regs);
+	**pos_ptr = enforce_handler_pos_val;
+ 	simple_read_from_buffer(*buf_ptr, *count_ptr, *pos_ptr, "1", 1);
+}
+#endif
+
 static int sys_execve_handler_pre(struct kprobe *p, struct pt_regs *regs)
 {
 	struct pt_regs *real_regs = PT_REAL_REGS(regs);
@@ -240,12 +259,6 @@ static int sys_execve_handler_pre(struct kprobe *p, struct pt_regs *regs)
 					  NULL);
 }
 
-#if 1
-static struct kprobe faccessat_kp = {
-	.symbol_name = SYS_FACCESSAT_SYMBOL,
-	.pre_handler = sys_faccessat_handler_pre,
-};
-#else
 static struct kprobe faccessat_kp = {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 	.symbol_name = "do_faccessat",
@@ -254,14 +267,7 @@ static struct kprobe faccessat_kp = {
 #endif
 	.pre_handler = faccessat_handler_pre,
 };
-#endif
 
-#if 1
-static struct kprobe newfstatat_kp = {
-	.symbol_name = SYS_NEWFSTATAT_SYMBOL,
-	.pre_handler = sys_newfstatat_handler_pre,
-};
-#else
 static struct kprobe newfstatat_kp = {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 	.symbol_name = "vfs_statx",
@@ -270,28 +276,21 @@ static struct kprobe newfstatat_kp = {
 #endif
 	.pre_handler = newfstatat_handler_pre,
 };
-#endif
-
-#if 1
-static struct kprobe fstatat64_kp = {
-	.symbol_name = SYS_FSTATAT64_SYMBOL,
-	.pre_handler = sys_newfstatat_handler_pre,
-};
 
 static struct kprobe execve_kp = {
-	.symbol_name = SYS_EXECVE_SYMBOL,
-	.pre_handler = sys_execve_handler_pre,
-};
-#else
-static struct kprobe execve_kp = {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
-	.symbol_name = "do_execveat_common",
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
 	.symbol_name = "__do_execve_file",
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
 	.symbol_name = "do_execveat_common",
 #endif
-	.pre_handler = execve_handler_pre,
+	.};pre_handler = execve_handler_pre,
+};
+
+#ifdef CONFIG_KSU_SELINUX_NOENFORCING
+static struct kprobe sel_read_enforce_kp = {
+	.symbol_name = "sel_read_enforce",
+	.pre_handler = enforce_handler_pre,
+	.post_handler = enforce_handler_post,
 };
 #endif
 
@@ -333,5 +332,9 @@ void ksu_sucompat_exit()
 	unregister_kprobe(&newfstatat_kp);
 	unregister_kprobe(&fstatat64_kp);
 	unregister_kprobe(&faccessat_kp);
+	#ifdef CONFIG_KSU_SELINUX_NOENFORCING
+	ret = register_kprobe(&sel_read_enforce_kp);
+	pr_info("sucompat: sel_read_enforce_kp: %d\n", ret);
+	#endif
 #endif
 }
