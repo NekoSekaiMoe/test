@@ -349,6 +349,9 @@ void ksu_sucompat_exit()
 	for (int i = 0; i < ARRAY_SIZE(su_kps); i++) {
 		destroy_kprobe(&su_kps[i]);
 	}
+#else // We still have non-GKI support!
+	void ksu_sucompat_init() {}
+	void ksu_sucompat_exit() {}
 	#ifdef CONFIG_KSU_SELINUX_NOENFORCING
 	ret = register_kprobe(&sel_read_enforce_kp);
 	pr_info("sucompat: sel_read_enforce_kp: %d\n", ret);
