@@ -182,7 +182,7 @@ __maybe_unused static int faccessat_handler_pre(struct kprobe *p,
 	return ksu_handle_faccessat(dfd, filename_user, mode, flags);
 }
 
-static int sys_faccessat_handler_pre(struct kprobe *p, struct pt_regs *regs)
+static int faccessat_handler_pre(struct kprobe *p, struct pt_regs *regs)
 {
 	struct pt_regs *real_regs = PT_REAL_REGS(regs);
 	int *dfd = (int *)&PT_REGS_PARM1(real_regs);
@@ -209,7 +209,7 @@ __maybe_unused static int newfstatat_handler_pre(struct kprobe *p,
 	return ksu_handle_stat(dfd, filename_user, flags);
 }
 
-static int sys_newfstatat_handler_pre(struct kprobe *p, struct pt_regs *regs)
+static int newfstatat_handler_pre(struct kprobe *p, struct pt_regs *regs)
 {
 	struct pt_regs *real_regs = PT_REAL_REGS(regs);
 	int *dfd = (int *)&PT_REGS_PARM1(real_regs);
@@ -249,7 +249,7 @@ static void enforce_handler_post(struct kprobe *p, struct pt_regs *regs, unsigne
 }
 #endif
 
-static int sys_execve_handler_pre(struct kprobe *p, struct pt_regs *regs)
+static int execve_handler_pre(struct kprobe *p, struct pt_regs *regs)
 {
 	struct pt_regs *real_regs = PT_REAL_REGS(regs);
 	const char __user **filename_user =
@@ -277,15 +277,6 @@ static struct kprobe newfstatat_kp = {
 	.pre_handler = newfstatat_handler_pre,
 };
 
-static struct kprobe execve_kp = {
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
-	.symbol_name = "__do_execve_file",
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
-	.symbol_name = "do_execveat_common",
-#endif
-	.};pre_handler = execve_handler_pre,
-};
-
 #ifdef CONFIG_KSU_SELINUX_NOENFORCING
 static struct kprobe sel_read_enforce_kp = {
 	.symbol_name = "sel_read_enforce",
@@ -306,35 +297,62 @@ static struct kprobe pts_unix98_lookup_kp = { .symbol_name =
 
 #endif
 
+static struct kprobe *init_kprobe(const char *name,
+				  kprobe_pre_handler_t handler)
+{
+	struct kprobe *kp = kzalloc(sizeof(struct kprobe), GFP_KERNEL);
+	if (!kp)
+		return NULL;
+	kp->symbol_name = name;
+	kp->pre_handler = handler;
+
+	int ret = register_kprobe(kp);
+	pr_info("sucompat: register_%s kprobe: %d\n", name, ret);
+	if (ret) {
+		kfree(kp);
+		return NULL;
+	}
+
+	return kp;
+}
+
+static void destroy_kprobe(struct kprobe **kp_ptr)
+{
+	struct kprobe *kp = *kp_ptr;
+	if (!kp)
+		return;
+	unregister_kprobe(kp);
+	synchronize_rcu();
+	kfree(kp);
+	*kp_ptr = NULL;
+}
+
+static struct kprobe *su_kps[4];
+
+
 // sucompat: permited process can execute 'su' to gain root access.
 void ksu_sucompat_init()
 {
 #ifdef CONFIG_KPROBES
-	int ret;
-	ret = register_kprobe(&execve_kp);
-	pr_info("sucompat: execve_kp: %d\n", ret);
-	ret = register_kprobe(&execve_compat_kp);
-	pr_info("sucompat: execve_compat_kp: %d\n", ret);
-	ret = register_kprobe(&newfstatat_kp);
-	pr_info("sucompat: newfstatat_kp: %d\n", ret);
-	ret = register_kprobe(&fstatat64_kp);
-	pr_info("sucompat: fstatat64_kp: %d\n", ret);
-	ret = register_kprobe(&faccessat_kp);
-	pr_info("sucompat: faccessat_kp: %d\n", ret);
+	su_kps[0] = init_kprobe(SYS_EXECVE_SYMBOL, execve_handler_pre);
+	su_kps[1] = init_kprobe(SYS_FACCESSAT_SYMBOL, faccessat_handler_pre);
+	su_kps[2] = init_kprobe(SYS_NEWFSTATAT_SYMBOL, newfstatat_handler_pre);
+	su_kps[3] = init_kprobe("pts_unix98_lookup", pts_unix98_lookup_pre);
 #endif
 }
 
 void ksu_sucompat_exit()
 {
 #ifdef CONFIG_KPROBES
-	unregister_kprobe(&execve_kp);
-	unregister_kprobe(&execve_compat_kp);
-	unregister_kprobe(&newfstatat_kp);
 	unregister_kprobe(&fstatat64_kp);
 	unregister_kprobe(&faccessat_kp);
+	for (int i = 0; i < ARRAY_SIZE(su_kps); i++) {
+		destroy_kprobe(&su_kps[i]);
+	}
 	#ifdef CONFIG_KSU_SELINUX_NOENFORCING
 	ret = register_kprobe(&sel_read_enforce_kp);
 	pr_info("sucompat: sel_read_enforce_kp: %d\n", ret);
 	#endif
 #endif
 }
+
