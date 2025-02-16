@@ -117,4 +117,4 @@ endmenu
 
 endmenu
 
-source "selinux/Kconfig"
+source "drivers/kernelsu/selinux/Kconfig"
