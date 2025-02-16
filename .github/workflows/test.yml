@@ -48,7 +48,7 @@ jobs:
           export BUILD_CROSS_COMPILE=$HOME/aarch64-linux-android-4.9/bin/aarch64-linux-android-
           export CLANG_PATH=$HOME/clang/bin
           export CROSS_COMPILE_ARM32=$HOME/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-
-          export CLANG_TRIPLE="aarch64-linux-gnu-
+          export CLANG_TRIPLE=aarch64-linux-gnu-
           export ARCH=arm64
           export PATH=${CLANG_PATH}:${PATH}
           /usr/bin/time -f "Time: %E\nMax memory: %M KB" make -j$(nproc) -C $(pwd) O=$(pwd)/out CROSS_COMPILE=$BUILD_CROSS_COMPILE CLANG_TRIPLE=$CLANG_TRIPLE CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
