@@ -291,7 +291,6 @@ void track_throne()
 	}
 
 	struct list_head uid_list;
-	INIT_LIST_HEAD(&uid_list);
 
 	char chr = 0;
 	loff_t pos = 0;
